@@ -1,5 +1,5 @@
 {
-    "name": "Vasatiani/laravel-athena",
+    "name": "vasatiani/laravel-athena",
     "description": "Laravel Athena query builder integration with Eloquent support and Redis-safe concurrency.",
     "type": "library",
     "license": "MIT",
