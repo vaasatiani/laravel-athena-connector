@@ -3,35 +3,26 @@
 namespace Vasatiani\Athena\Query;
 
 use Illuminate\Database\Query\Grammars\MySqlGrammar;
-use Illuminate\Database\Query\Builder;
+use Illuminate\Database\ConnectionInterface;
 
 class Grammar extends MySqlGrammar
 {
-    /**
-     * Compile a custom LIMIT clause for Athena (Presto-compatible).
-     *
-     * @param  Builder  $query
-     * @param  int  $limit
-     * @return string
-     */
-    protected function compileLimit(Builder $query, $limit)
+    public function __construct(ConnectionInterface $connection)
+    {
+        parent::__construct($connection);
+    }
+
+    protected function compileLimit($query, $limit)
     {
         if (is_int($query->offset)) {
-            return 'BETWEENLIMIT ' . (int) $limit;
+            return 'BETWEENLIMIT '.(int) $limit;
         }
 
         return parent::compileLimit($query, $limit);
     }
 
-    /**
-     * Athena-specific OFFSET simulation marker.
-     *
-     * @param  Builder  $query
-     * @param  int  $offset
-     * @return string
-     */
-    protected function compileOffset(Builder $query, $offset)
+    protected function compileOffset($query, $offset)
     {
-        return 'AND ' . (int) $offset;
+        return 'AND '.(int) $offset;
     }
 }
