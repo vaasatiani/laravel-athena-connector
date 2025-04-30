@@ -183,4 +183,4 @@ DB::connection('athena')->select("SELECT count(*) as total FROM users");
 
 ## 📘 License
 
-MIT © [Vakho Asatiani](mailto:vasatiani@gmail.com)
+MIT © [Vakho Asatiani](mailto:vaasatiani@gmail.com)
