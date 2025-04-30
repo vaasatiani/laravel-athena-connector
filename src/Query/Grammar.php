@@ -7,6 +7,11 @@ use Illuminate\Database\Query\Builder;
 
 class Grammar extends MySqlGrammar
 {
+    
+    public function __construct(string $tablePrefix = '')
+    {
+        parent::__construct($tablePrefix);
+    }
     /**
      * Compile a custom LIMIT clause for Athena (Presto-compatible).
      * Instead of using native LIMIT/OFFSET, we use a marker string
