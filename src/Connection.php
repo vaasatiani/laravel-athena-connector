@@ -49,7 +49,7 @@ class Connection extends MySqlConnection
 
     public function getDefaultQueryGrammar(): QueryGrammar
     {
-        return $this->withTablePrefix(new QueryGrammar());
+        return $this->withTablePrefix(new QueryGrammar($this));
     }
 
     public function useDefaultPostProcessor(): void
