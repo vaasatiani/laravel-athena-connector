@@ -2,8 +2,8 @@
 
 namespace Vasatiani\Athena;
 
-use WifisherConnector\Athena\Eloquent\Builder as AthenaBuilder;
-use WifisherConnector\Athena\Eloquent\Collection as AthenaCollection;
+use Vasatiani\Athena\Eloquent\Builder as AthenaBuilder;
+use Vasatiani\Athena\Eloquent\Collection as AthenaCollection;
 use Illuminate\Database\Eloquent\Model as BaseModel;
 use Illuminate\Database\Eloquent\Builder as BaseBuilder;
 
