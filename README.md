@@ -38,14 +38,14 @@ php artisan vendor:publish --tag=config
 ```php
 return [
     'credentials' => [
-        'key'    => env('AWS_KEY', ''),
-        'secret' => env('AWS_SECRET', ''),
+        'key'    => env('AWS_ATHENA_KEY', ''),
+        'secret' => env('AWS_ATHENA_SECRET', ''),
     ],
-    'region'        => env('AWS_REGION', 'eu-central-1'),
+    'region'        => env('AWS_ATHENA_REGION', 'eu-central-1'),
     'version'       => 'latest',
     'database'      => env('ATHENA_DB', ''),
     'prefix'        => env('ATHENA_TABLE_PREFIX', ''),
-    'bucket'        => env('S3_BUCKET', ''),
+    'bucket'        => env('S3_ATHENA_BUCKET', ''),
     'outputfolder'  => env('ATHENA_OUTPUT_FOLDER', 'athena-output'),
 
     's3output'      => 's3://' . env('S3_BUCKET', '') . '/' . env('ATHENA_OUTPUT_FOLDER', 'athena-output'),
@@ -67,10 +67,10 @@ return [
 Make sure your `.env` contains:
 
 ```env
-AWS_KEY=your-key
-AWS_SECRET=your-secret
-AWS_REGION=eu-central-1
-S3_BUCKET=your-bucket
+AWS_ATHENA_KEY=your-key
+AWS_ATHENA_SECRET=your-secret
+AWS_ATHENA_REGION=eu-central-1
+S3_ATHENA_BUCKET=your-bucket
 ATHENA_DB=your_database
 ATHENA_OUTPUT_FOLDER=athena-output
 ```
