@@ -12,15 +12,15 @@ return [
     */
 
     'credentials' => [
-        'key'    => env('AWS_KEY', ''),
-        'secret' => env('AWS_SECRET', ''),
+        'key'    => env('AWS_ATHENA_KEY', ''),
+        'secret' => env('AWS_ATHENA_SECRET', ''),
     ],
 
-    'region'        => env('AWS_REGION', 'eu-central-1'),
+    'region'        => env('AWS_ATHENA_REGION', 'eu-central-1'),
     'version'       => 'latest',
     'database'      => env('ATHENA_DB', ''),
     'prefix'        => env('ATHENA_TABLE_PREFIX', ''),
-    'bucket'        => env('S3_BUCKET', ''),
+    'bucket'        => env('S3_ATHENA_BUCKET', ''),
     'outputfolder'  => env('ATHENA_OUTPUT_FOLDER', 'athena-output'),
 
     /*
@@ -33,7 +33,7 @@ return [
     |
     */
 
-    's3output' => 's3://' . env('S3_BUCKET', '') . '/' . env('ATHENA_OUTPUT_FOLDER', 'athena-output'),
+    's3output' => 's3://' . env('S3_ATHENA_BUCKET', '') . '/' . env('ATHENA_OUTPUT_FOLDER', 'athena-output'),
 
     /*
     |--------------------------------------------------------------------------
