@@ -14,21 +14,21 @@ class Processor extends BaseProcessor
      * @param  array  $results
      * @return array
      */
-    public function processSelect(Builder $query, $results)
-    {
-        $columns = [];
-        $parsed = [];
-
-        foreach ($results as $index => $row) {
-            $values = array_map(fn($v) => $v['VarCharValue'] ?? null, $row['Data']);
-
-            if ($index === 0) {
-                $columns = $values;
-            } else {
-                $parsed[] = array_combine($columns, $values);
-            }
-        }
-
-        return $parsed;
-    }
+//    public function processSelect(Builder $query, $results)
+//    {
+//        $columns = [];
+//        $parsed = [];
+//        dd($results);
+//        foreach ($results as $index => $row) {
+//            $values = array_map(fn($v) => $v['VarCharValue'] ?? null, $row['Data']);
+//
+//            if ($index === 0) {
+//                $columns = $values;
+//            } else {
+//                $parsed[] = array_combine($columns, $values);
+//            }
+//        }
+//
+//        return $parsed;
+//    }
 }

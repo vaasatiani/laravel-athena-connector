@@ -1,6 +1,6 @@
 <?php
 
-namespace Vasatuiani\Athena\Eloquent;
+namespace Vasatiani\Athena\Eloquent;
 
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 
