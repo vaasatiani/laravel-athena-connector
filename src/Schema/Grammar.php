@@ -6,10 +6,23 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\Grammars\MySqlGrammar;
 use Illuminate\Support\Fluent;
 
+/**
+ * Schema grammar for AWS Athena.
+ *
+ * Generates CREATE EXTERNAL TABLE statements compatible with Athena's DDL syntax.
+ * Strips unsupported MySQL modifiers like UNSIGNED, CHARSET, COLLATE, and COMMENT.
+ */
 class Grammar extends MySqlGrammar
 {
     /**
-     * Compile a create table command for Athena.
+     * Compile a CREATE EXTERNAL TABLE command for Athena.
+     *
+     * Generates Athena-compatible DDL with column definitions, storage format,
+     * S3 location, and table properties. Uses configuration values for customization.
+     *
+     * @param Blueprint $blueprint Table schema definition
+     * @param Fluent $command Create command details
+     * @return string Compiled CREATE EXTERNAL TABLE statement
      */
     public function compileCreate(Blueprint $blueprint, Fluent $command)
     {
@@ -33,10 +46,50 @@ class Grammar extends MySqlGrammar
     }
 
     /**
-     * Strip unsupported modifiers from Athena columns.
+     * Strip UNSIGNED modifier (not supported by Athena).
+     *
+     * @param Blueprint $blueprint Table schema definition
+     * @param Fluent $column Column definition
+     * @return string Empty string (modifier removed)
      */
-    protected function modifyUnsigned(Blueprint $blueprint, Fluent $column) { return ''; }
-    protected function modifyCharset(Blueprint $blueprint, Fluent $column) { return ''; }
-    protected function modifyCollate(Blueprint $blueprint, Fluent $column) { return ''; }
-    protected function modifyComment(Blueprint $blueprint, Fluent $column) { return ''; }
+    protected function modifyUnsigned(Blueprint $blueprint, Fluent $column)
+    {
+        return '';
+    }
+
+    /**
+     * Strip CHARSET modifier (not supported by Athena).
+     *
+     * @param Blueprint $blueprint Table schema definition
+     * @param Fluent $column Column definition
+     * @return string Empty string (modifier removed)
+     */
+    protected function modifyCharset(Blueprint $blueprint, Fluent $column)
+    {
+        return '';
+    }
+
+    /**
+     * Strip COLLATE modifier (not supported by Athena).
+     *
+     * @param Blueprint $blueprint Table schema definition
+     * @param Fluent $column Column definition
+     * @return string Empty string (modifier removed)
+     */
+    protected function modifyCollate(Blueprint $blueprint, Fluent $column)
+    {
+        return '';
+    }
+
+    /**
+     * Strip COMMENT modifier (not supported by Athena).
+     *
+     * @param Blueprint $blueprint Table schema definition
+     * @param Fluent $column Column definition
+     * @return string Empty string (modifier removed)
+     */
+    protected function modifyComment(Blueprint $blueprint, Fluent $column)
+    {
+        return '';
+    }
 }

@@ -5,8 +5,10 @@ namespace Vasatiani\Athena;
 use Aws\Athena\AthenaClient;
 use Exception;
 use Illuminate\Database\MySqlConnection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Vasatiani\Athena\Query\Grammar as QueryGrammar;
 use Vasatiani\Athena\Query\Processor;
 use Vasatiani\Athena\Schema\Builder;
@@ -81,16 +83,52 @@ class Connection extends MySqlConnection
         return new SchemaGrammar;
     }
 
+    /**
+     * Safely escape a binding value for SQL query.
+     *
+     * @param mixed $value Value to escape
+     * @return string Escaped value
+     */
+    protected function escapeBinding(mixed $value): string
+    {
+        if (is_null($value)) {
+            return 'NULL';
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        // Escape string values by replacing single quotes with two single quotes
+        // This is the SQL standard way to escape quotes in string literals
+        $escaped = str_replace("'", "''", (string) $value);
+        return "'" . $escaped . "'";
+    }
+
+    /**
+     * Prepare query by safely binding parameters.
+     *
+     * @param string $query SQL query with placeholders
+     * @param array $bindings Array of values to bind
+     * @return string Prepared query with bound values
+     */
     protected function prepareQuery(string $query, array $bindings): string
     {
         foreach ($bindings as $bind) {
-            $replacement = is_numeric($bind) ? $bind : "'" . addslashes($bind) . "'";
+            $replacement = $this->escapeBinding($bind);
             $query = preg_replace('/\?/', $replacement, $query, 1);
         }
 
         if (stripos($query, 'BETWEENLIMIT') !== false) {
-            if (!stripos($query, 'ROW_NUMBER()') || !stripos($query, ' rn ')) {
-                throw new Exception("Missing ROW_NUMBER() OVER(...) as rn for LIMIT simulation");
+            if (stripos($query, 'ROW_NUMBER()') === false || stripos($query, ' rn ') === false) {
+                throw new Exception(
+                    "BETWEENLIMIT requires ROW_NUMBER() OVER(...) as rn alias. "
+                    . "The query grammar should auto-generate this for LIMIT/OFFSET queries."
+                );
             }
 
             $parts = preg_split("/BETWEENLIMIT/i", $query);
@@ -108,6 +146,17 @@ class Connection extends MySqlConnection
         return str_replace('`', '', $query);
     }
 
+    /**
+     * Execute an Athena query with concurrency control.
+     *
+     * Uses Redis locking to prevent exceeding AWS Athena's concurrent query limits.
+     * Polls query status until completion or failure.
+     *
+     * @param string $query SQL query (will be modified with bound parameters)
+     * @param array $bindings Parameter values to bind
+     * @return array Query execution details from Athena
+     * @throws Exception If query fails or is cancelled
+     */
     protected function executeQuery(string &$query, array $bindings): array
     {
         $query = $this->prepareQuery($query, $bindings);
@@ -115,24 +164,40 @@ class Connection extends MySqlConnection
         $lockKey = config('athena.lock_key', 'athena:query:concurrency');
         $lockTimeout = config('athena.lock_timeout', 10); // lock held duration
         $lockWait = config('athena.lock_wait', 5); // max wait time
+        $pollInterval = (int) config('athena.query_poll_interval', 1);
 
-        return Cache::lock($lockKey, $lockTimeout)->block($lockWait, function () use (&$query) {
-            $result = $this->athenaClient->startQueryExecution([
-                'QueryString' => $query,
-                'QueryExecutionContext' => ['Database' => $this->config['database']],
-                'ResultConfiguration' => ['OutputLocation' => $this->config['s3output']],
-            ]);
+        return Cache::lock($lockKey, $lockTimeout)->block($lockWait, function () use (&$query, $pollInterval) {
+            try {
+                $result = $this->athenaClient->startQueryExecution([
+                    'QueryString' => $query,
+                    'QueryExecutionContext' => ['Database' => $this->config['database']],
+                    'ResultConfiguration' => ['OutputLocation' => $this->config['s3output']],
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('Athena query execution failed to start', [
+                    'error' => $e->getMessage(),
+                    'query' => substr($query, 0, 500), // Log first 500 chars
+                ]);
+                throw new Exception("Failed to start Athena query execution: " . $e->getMessage(), 0, $e);
+            }
 
             $queryId = $result->get('QueryExecutionId');
 
             $status = 'QUEUED';
             while (in_array($status, ['QUEUED', 'RUNNING'])) {
-                sleep(1);
+                sleep($pollInterval);
                 $exec = $this->athenaClient->getQueryExecution(['QueryExecutionId' => $queryId]);
                 $status = $exec['QueryExecution']['Status']['State'];
 
                 if (in_array($status, ['FAILED', 'CANCELLED'])) {
-                    throw new Exception("Athena Query Failed: " . ($exec['QueryExecution']['Status']['StateChangeReason'] ?? 'unknown'));
+                    $reason = $exec['QueryExecution']['Status']['StateChangeReason'] ?? 'unknown';
+                    Log::error('Athena query execution failed', [
+                        'query_id' => $queryId,
+                        'status' => $status,
+                        'reason' => $reason,
+                        'query' => substr($query, 0, 500),
+                    ]);
+                    throw new Exception("Athena Query {$status}: {$reason}");
                 }
             }
 
@@ -149,24 +214,48 @@ class Connection extends MySqlConnection
         return true;
     }
 
+    /**
+     * Fetch paginated query results from Athena.
+     *
+     * Athena returns results in batches (default 500 rows) with NextToken for continuation.
+     * This method aggregates all batches into a single array efficiently.
+     *
+     * @param string $queryId AWS Query Execution ID
+     * @return array Processed result rows as associative arrays
+     * @throws Exception If query execution failed
+     */
     private function getDataWithQueryId(string $queryId): array
     {
-        $response = $this->athenaClient->getQueryResults(['QueryExecutionId' => $queryId, 'MaxResults' => 500])->toArray();
+        $maxResults = (int) config('athena.result_batch_size', 500);
+        $response = $this->athenaClient->getQueryResults([
+            'QueryExecutionId' => $queryId,
+            'MaxResults' => $maxResults
+        ])->toArray();
         $rows = $response['ResultSet']['Rows'];
 
+        // Use array_push with spread operator for O(1) per-item append instead of O(n) array_merge
         while (!empty($response['NextToken'])) {
             $response = $this->athenaClient->getQueryResults([
                 'QueryExecutionId' => $queryId,
                 'NextToken' => $response['NextToken'],
-                'MaxResults' => 500
+                'MaxResults' => $maxResults
             ])->toArray();
 
-            $rows = array_merge($rows, $response['ResultSet']['Rows']);
+            array_push($rows, ...$response['ResultSet']['Rows']);
         }
 
         return self::processResultRows($rows);
     }
 
+    /**
+     * Process Athena result rows into associative arrays.
+     *
+     * Athena returns results with column names in the first row and data in subsequent rows.
+     * This method converts that format to Laravel-compatible associative arrays.
+     *
+     * @param array $rows Raw rows from Athena API
+     * @return array Processed rows as associative arrays
+     */
     private static function processResultRows(array $rows): array
     {
         $columns = [];
@@ -184,6 +273,17 @@ class Connection extends MySqlConnection
         return $results;
     }
 
+    /**
+     * Execute a SELECT query with query caching support.
+     *
+     * Uses MD5 hash of prepared query to cache execution IDs, allowing result reuse.
+     * Falls back to direct execution if cache table doesn't exist.
+     *
+     * @param string $query SQL query
+     * @param array $bindings Parameter values to bind
+     * @param bool $useReadPdo Unused parameter (kept for interface compatibility)
+     * @return array Query results as associative arrays
+     */
     public function select($query, $bindings = [], $useReadPdo = true): array
     {
         $hash = md5($this->prepareQuery($query, $bindings));
@@ -193,10 +293,20 @@ class Connection extends MySqlConnection
             $cached = \Vasatiani\Athena\AthenaQueryHash::where('query_hash', $hash)->first();
 
             if ($cached) {
+                Log::debug('Using cached Athena query result', ['hash' => $hash]);
                 return $this->getDataWithQueryId($cached->aws_return_id);
             }
+        } catch (QueryException $e) {
+            // Expected: cache table doesn't exist yet
+            Log::debug('Query cache table not available, executing query directly', [
+                'error' => $e->getMessage()
+            ]);
         } catch (\Throwable $e) {
-            // silently fail if table not found
+            // Unexpected error - log but don't fail the query
+            Log::warning('Unexpected error checking query cache', [
+                'error' => $e->getMessage(),
+                'hash' => $hash
+            ]);
         }
 
         if ($this->pretending()) return [];
@@ -210,8 +320,16 @@ class Connection extends MySqlConnection
                 'query_hash' => $hash,
                 'aws_return_id' => $exec['QueryExecution']['QueryExecutionId'],
             ]);
+            Log::debug('Cached Athena query result', ['hash' => $hash]);
+        } catch (QueryException $e) {
+            // Expected: cache table doesn't exist
+            Log::debug('Query cache table not available, skipping cache storage');
         } catch (\Throwable $e) {
-            // silently ignore
+            // Unexpected error - log but don't fail the query
+            Log::warning('Unexpected error storing query cache', [
+                'error' => $e->getMessage(),
+                'hash' => $hash
+            ]);
         }
 
         $results = $this->getDataWithQueryId($exec['QueryExecution']['QueryExecutionId']);
