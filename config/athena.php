@@ -49,4 +49,17 @@ return [
     'lock_timeout' => env('ATHENA_LOCK_TIMEOUT', 10), // lock is held for 10 seconds
     'lock_wait'    => env('ATHENA_LOCK_WAIT', 5),      // wait up to 5 seconds for lock
 
+    /*
+    |--------------------------------------------------------------------------
+    | Query Execution Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for query execution behavior including polling intervals
+    | and result batch sizes.
+    |
+    */
+
+    'query_poll_interval' => env('ATHENA_QUERY_POLL_INTERVAL', 1), // seconds between status polls
+    'result_batch_size'   => env('ATHENA_RESULT_BATCH_SIZE', 500), // rows per page in results
+
 ];
