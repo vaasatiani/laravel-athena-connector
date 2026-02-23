@@ -1,7 +1,7 @@
 # Laravel Athena Query Builder
 
 A modern, clean, and scalable integration of AWS Athena with Laravel's Query Builder and Eloquent ORM.  
-Built with full support for Laravel 10–12, Redis-based concurrency limits, Octane/Swoole compatibility, and Athena-specific query and schema grammar.
+Built with full support for **Lumen 9** and **Laravel 9–12**, Redis-based concurrency limits, Octane/Swoole compatibility, and Athena-specific query and schema grammar.
 
 ---
 
@@ -23,10 +23,44 @@ Built with full support for Laravel 10–12, Redis-based concurrency limits, Oct
 composer require vasatiani/laravel-athena
 ```
 
-Then publish the config file:
+### Laravel
+
+Publish the config file:
 
 ```bash
 php artisan vendor:publish --tag=config
+```
+
+### Lumen 9
+
+Register the service provider in `bootstrap/app.php`:
+
+```php
+$app->register(Vasatiani\Athena\AthenaServiceProvider::class);
+```
+
+Copy the config file manually:
+
+```bash
+cp vendor/vasatiani/laravel-athena/config/athena.php config/athena.php
+```
+
+Load the config in `bootstrap/app.php`:
+
+```php
+$app->configure('athena');
+```
+
+Add the database connection in `config/database.php`:
+
+```php
+'connections' => [
+    // ... other connections
+    
+    'athena' => [
+        'driver' => 'athena',
+    ],
+],
 ```
 
 ---
