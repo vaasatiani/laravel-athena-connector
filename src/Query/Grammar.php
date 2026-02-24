@@ -14,11 +14,6 @@ use Illuminate\Database\ConnectionInterface;
  */
 class Grammar extends MySqlGrammar
 {
-    public function __construct(ConnectionInterface $connection)
-    {
-        parent::__construct($connection);
-    }
-
     /**
      * Compile the LIMIT clause for Athena queries.
      *
@@ -54,3 +49,4 @@ class Grammar extends MySqlGrammar
         return 'AND '.(int) $offset;
     }
 }
+
